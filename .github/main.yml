@@ -1,0 +1,112 @@
+name: Windows Cloud PC - AnyDesk Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Start Building...
+    runs-on: windows-latest
+
+    # GitHub-hosted runners têm limite de 6 horas
+    timeout-minutes: 360
+
+    steps:
+      - name: Download AnyDesk
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $url = "https://download.anydesk.com/AnyDesk.exe"
+          $installer = "$env:RUNNER_TEMP\AnyDesk.exe"
+
+          Write-Host "Baixando AnyDesk..."
+          Invoke-WebRequest `
+            -Uri $url `
+            -OutFile $installer
+
+          if (-not (Test-Path $installer)) {
+            throw "O arquivo do AnyDesk não foi baixado."
+          }
+
+          Write-Host "Download concluído:"
+          Write-Host $installer
+
+      - name: Install AnyDesk
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $installer = "$env:RUNNER_TEMP\AnyDesk.exe"
+          $installDir = "C:\Program Files (x86)\AnyDesk"
+
+          Write-Host "Instalando AnyDesk..."
+
+          & $installer `
+            --install "$installDir" `
+            --silent `
+            --start-with-win
+
+          Start-Sleep -Seconds 10
+
+          $anydesk = Join-Path $installDir "AnyDesk.exe"
+
+          if (-not (Test-Path $anydesk)) {
+            throw "AnyDesk.exe não foi encontrado em: $anydesk"
+          }
+
+          Write-Host "AnyDesk instalado corretamente."
+          Write-Host "Executável: $anydesk"
+
+      - name: Start AnyDesk
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $anydesk = "C:\Program Files (x86)\AnyDesk\AnyDesk.exe"
+
+          if (-not (Test-Path $anydesk)) {
+            throw "AnyDesk.exe não encontrado."
+          }
+
+          Write-Host "Iniciando AnyDesk..."
+
+          Start-Process `
+            -FilePath $anydesk `
+            -WorkingDirectory "C:\Program Files (x86)\AnyDesk"
+
+          Start-Sleep -Seconds 10
+
+      - name: Verify AnyDesk
+        shell: powershell
+        run: |
+          $process = Get-Process -Name "AnyDesk" -ErrorAction SilentlyContinue
+
+          if ($process) {
+            Write-Host "AnyDesk está executando corretamente."
+            $process | Select-Object Id, ProcessName, Path
+          }
+          else {
+            Write-Error "AnyDesk não está executando."
+            exit 1
+          }
+
+      - name: Show AnyDesk Information
+        shell: powershell
+        run: |
+          $anydesk = "C:\Program Files (x86)\AnyDesk\AnyDesk.exe"
+
+          if (Test-Path $anydesk) {
+            Write-Host "=== AnyDesk ==="
+            Write-Host "Executável: $anydesk"
+
+            & $anydesk --version
+          }
+
+      - name: Keep Job Running
+        shell: powershell
+        run: |
+          Write-Host "Runner ativo."
+          Write-Host "O GitHub encerrará o job quando atingir o limite permitido."
+
+          Start-Sleep -Seconds 21600
